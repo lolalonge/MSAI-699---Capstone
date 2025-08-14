@@ -1,0 +1,135 @@
+import pandas as pd
+import random
+
+def generate_synthetic_data(num_samples=50):
+    data = []
+    categories = ['High', 'Medium', 'Low']
+
+    high_reflections = [
+        "AI's ability to process vast datasets and identify complex patterns is revolutionizing medical diagnostics, enabling earlier and more accurate disease detection.",
+        "The ethical implications of autonomous AI systems, particularly in decision-making processes that affect human lives, necessitate robust regulatory frameworks and transparent accountability.",
+        "Transfer learning in neural networks significantly reduces the computational resources and data required for training new models, accelerating AI adoption across diverse applications.",
+        "Explainable AI (XAI) is crucial for building trust and ensuring fairness in critical applications by providing insights into model predictions, mitigating the 'black box' problem.",
+        "The integration of AI with quantum computing holds immense potential for solving currently intractable problems, particularly in drug discovery and materials science, by leveraging quantum parallelism."
+    ]
+
+    medium_reflections = [
+        "AI is becoming more common in everyday life, like in our phones and smart speakers, making things easier for us.",
+        "It's important to think about how AI might change jobs in the future, as some tasks could be automated by machines.",
+        "Machine learning helps computers learn from data without being explicitly programmed, which is a big step forward.",
+        "AI can help analyze a lot of information quickly, which is useful for businesses trying to understand their customers.",
+        "There are some concerns about AI making mistakes, so we need to be careful when using it in important areas."
+    ]
+
+    low_reflections = [
+        "AI is just robots doing stuff. It's cool.",
+        "Computers are getting smarter because of AI. I don't really get how.",
+        "I heard AI can beat people at games. That's all I know.",
+        "AI is like, really advanced technology. It's complicated.",
+        "Some people think AI is scary, but I think it's fine."
+    ]
+
+    all_reflections = {
+        'High': high_reflections,
+        'Medium': medium_reflections,
+        'Low': low_reflections
+    }
+
+    for _ in range(num_samples):
+        category = random.choice(categories)
+        reflection = random.choice(all_reflections[category])
+        data.append({'text': reflection, 'label': category})
+
+    df = pd.DataFrame(data)
+    df.to_csv('synthetic_ai_reflections.csv', index=False)
+    print(f"Generated {num_samples} synthetic reflections and saved to synthetic_ai_reflections.csv")
+
+if __name__ == "__main__":
+    generate_synthetic_data(num_samples=50)
+
+
+import re
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+from sklearn.model_selection import train_test_split
+
+from sklearn.linear_model import LogisticRegression
+
+from sklearn.model_selection import cross_val_score, StratifiedKFold
+
+from sklearn.metrics import classification_report, accuracy_score
+
+from nltk.corpus import stopwords
+
+import nltk
+
+# Download stopwords if not already downloaded
+
+try:
+
+    stopwords.words("english")
+
+except LookupError:
+
+    nltk.download("stopwords")
+
+def preprocess_text(text):
+
+    text = text.lower()  # Lowercasing
+
+    text = re.sub(r'[^\w\s]', '', text)  # Punctuation removal
+
+    return text
+
+ def main():
+
+    # Load the dataset
+
+    df = pd.read_csv("synthetic_ai_reflections.csv")
+
+     # Preprocessing
+
+    df["processed_text"] = df["text"].apply(preprocess_text)
+
+    # Stop-word filtering
+
+    stop_words = set(stopwords.words("english"))
+
+    df["processed_text"] = df["processed_text"].apply(lambda x: " ".join([word for word in x.split() if word not in stop_words]))
+
+     # TF-IDF Vectorization
+
+    tfidf_vectorizer = TfidfVectorizer()
+
+    X = tfidf_vectorizer.fit_transform(df["processed_text"])
+
+    y = df["label"]
+
+     # Split data for training and testing
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+     # Train Logistic Regression Model
+
+    model = LogisticRegression(max_iter=1000)
+
+    model.fit(X_train, y_train)
+
+ 
+
+    # Evaluate the model
+
+    y_pred = model.predict(X_test)
+
+    print("Classification Report:")
+
+    print(classification_report(y_test, y_pred))
+
+     # accuracy
+
+    accuracy = accuracy_score(y_test, y_pred)
+
+    print(f"Accuracy: {accuracy}")
+
+ main()
