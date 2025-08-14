@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Capstone AI Literacy Classifier Project</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 50px; }
+        textarea { width: 100%; height: 100px; }
+        button { padding: 10px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1 style="color:green">Capstone AI Literacy Classifier Project Demo</h1>
+    <form method="POST">
+        <textarea name="text" placeholder="Enter student reflection..."></textarea><br>
+        <button type="submit">Classify</button>
+    </form>
+
+    {% if prediction %}
+        <h2>Prediction: {{ prediction }}</h2>
+        <h3>Probabilities:</h3>
+        <ul>
+        {% for label, prob in probabilities.items() %}
+            <li>{{ label }}: {{ "%.2f"|format(prob*100) }}%</li>
+        {% endfor %}
+        </ul>
+    {% endif %}
+</body>
+</html>
+
