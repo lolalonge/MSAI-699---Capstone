@@ -1,0 +1,169 @@
+import re
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold, GridSearchCV
+
+from sklearn.linear_model import LogisticRegression
+
+from sklearn.metrics import classification_report, accuracy_score
+
+from nltk.corpus import stopwords
+
+import nltk
+
+import shap
+
+ # Downloading stopwords if not already downloaded
+
+try:
+
+    stopwords.words("english")
+
+except LookupError:
+
+    nltk.download("stopwords")
+
+ def preprocess_text(text):
+
+    text = text.lower()
+
+    text = re.sub(r'[^\w\s]', '', text)
+
+    return text
+
+def main():
+
+    # Load the dataset
+
+    df = pd.read_csv("synthetic_ai_reflections.csv")
+ 
+    # Preprocessing
+
+    df["processed_text"] = df["text"].apply(preprocess_text)
+
+     # Stop-word filtering
+
+    stop_words = set(stopwords.words("english"))
+
+    df["processed_text"] = df["processed_text"].apply(lambda x: " ".join([word for word in x.split() if word not in stop_words]))
+
+    # TF-IDF Vectorization
+
+    tfidf_vectorizer = TfidfVectorizer()
+
+    X = tfidf_vectorizer.fit_transform(df["processed_text"])
+
+    y = df["label"]
+
+    # Split data for training and testing
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+     # Implementing k-fold cross-validation
+
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+    model = LogisticRegression(max_iter=1000)
+
+    scores = cross_val_score(model, X, y, cv=cv, scoring='accuracy')
+
+    print(f"Cross-validation accuracy scores: {scores}")
+
+    print(f"Mean cross-validation accuracy: {scores.mean()}")
+
+     # Hyperparameter tuning using GridSearchCV
+
+    param_grid = {
+
+        'C': [0.1, 1, 10, 100],
+
+        'solver': ['liblinear', 'lbfgs']
+
+    }
+
+    grid_search = GridSearchCV(LogisticRegression(max_iter=1000), param_grid, cv=cv, scoring='accuracy', n_jobs=-1)
+
+    grid_search.fit(X, y)
+
+    print(f"Best hyperparameters: {grid_search.best_params_}")
+
+    print(f"Best cross-validation accuracy: {grid_search.best_score_}")
+
+    # Training model with best hyperparameters
+
+    best_model = grid_search.best_estimator_
+
+    best_model.fit(X_train, y_train)
+
+    # Evaluating the best model
+
+    y_pred = best_model.predict(X_test)
+
+    print("Classification Report (Optimized Model):")
+
+    print(classification_report(y_test, y_pred))
+
+    accuracy = accuracy_score(y_test, y_pred)
+
+    print(f"Accuracy (Optimized Model): {accuracy}")
+
+     # Feature engineering: N-grams
+
+    tfidf_vectorizer_ngram = TfidfVectorizer(ngram_range=(1, 2))
+
+    X_ngram = tfidf_vectorizer_ngram.fit_transform(df["processed_text"])
+
+     X_train_ngram, X_test_ngram, y_train_ngram, y_test_ngram = train_test_split(X_ngram, y, test_size=0.2, random_state=42, stratify=y)
+
+     grid_search_ngram = GridSearchCV(LogisticRegression(max_iter=1000), param_grid, cv=cv, scoring='accuracy', n_jobs=-1)
+
+    grid_search_ngram.fit(X_ngram, y)
+
+     print(f"Best hyperparameters (N-gram): {grid_search_ngram.best_params_}")
+
+    print(f"Best cross-validation accuracy (N-gram): {grid_search_ngram.best_score_}")
+
+    best_model_ngram = grid_search_ngram.best_estimator_
+
+    best_model_ngram.fit(X_train_ngram, y_train_ngram)
+
+    y_pred_ngram = best_model_ngram.predict(X_test_ngram)
+
+    print("Classification Report (N-gram Optimized Model):")
+
+    print(classification_report(y_test_ngram, y_pred_ngram))
+
+    accuracy_ngram = accuracy_score(y_test_ngram, y_pred_ngram)
+
+    print(f"Accuracy (N-gram Optimized Model): {accuracy_ngram}")
+
+     # Using LinearExplainer for Logistic Regression
+
+    explainer = shap.LinearExplainer(best_model, X_train)
+
+    shap_values = explainer.shap_values(X_test)
+
+    feature_names = tfidf_vectorizer.get_feature_names_out()
+
+     print("\nSHAP Feature Importance (Top 10 for each class):")
+
+    for i, class_label in enumerate(best_model.classes_):
+
+        print(f"\nClass: {class_label}")
+
+        # Average absolute SHAP values for each feature for the current class
+
+        avg_shap_values = abs(shap_values[i]).mean(axis=0)
+
+        # Getting indices of top features
+
+        top_feature_indices = avg_shap_values.argsort()[-10:][::-1]
+
+        for idx in top_feature_indices:
+
+            print(f"  {feature_names[idx]}: {avg_shap_values[idx]:.4f}")
+
+if __name__ == "__main__":
+
+    main()
