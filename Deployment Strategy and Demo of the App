@@ -1,0 +1,91 @@
+import pandas as pd
+import re
+import pickle
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from nltk.corpus import stopwords
+import nltk
+
+# Download stopwords if not already
+try:
+    stopwords.words("english")
+except LookupError:
+    nltk.download("stopwords")
+
+def preprocess_text(text):
+    text = text.lower()
+    text = re.sub(r'[^\w\s]', '', text)
+    return " ".join([word for word in text.split() if word not in stop_words])
+
+# Load dataset
+df = pd.read_csv("data/synthetic_ai_reflections.csv")
+
+# Preprocess text
+stop_words = set(stopwords.words("english"))
+df["processed_text"] = df["text"].apply(preprocess_text)
+
+# Vectorization
+tfidf_vectorizer = TfidfVectorizer(ngram_range=(1,2))
+X = tfidf_vectorizer.fit_transform(df["processed_text"])
+y = df["label"]
+
+# Train model
+model = LogisticRegression(max_iter=1000, solver='liblinear', C=1)
+model.fit(X, y)
+
+# Save model and vectorizer
+with open("model.pkl", "wb") as f:
+    pickle.dump(model, f)
+
+with open("vectorizer.pkl", "wb") as f:
+    pickle.dump(tfidf_vectorizer, f)
+
+print("Model and vectorizer saved successfully!")
+
+
+from flask import Flask, request, jsonify, render_template
+import pickle
+import re
+from nltk.corpus import stopwords
+import nltk
+
+# Download stopwords if not already
+try:
+    stopwords.words("english")
+except LookupError:
+    nltk.download("stopwords")
+
+stop_words = set(stopwords.words("english"))
+
+# Load model and vectorizer
+with open("model.pkl", "rb") as f:
+    model = pickle.load(f)
+
+with open("vectorizer.pkl", "rb") as f:
+    tfidf_vectorizer = pickle.load(f)
+
+# Flask app
+app = Flask(__name__)
+
+def preprocess_text(text):
+    text = text.lower()
+    text = re.sub(r'[^\w\s]', '', text)
+    return " ".join([word for word in text.split() if word not in stop_words])
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        user_text = request.form["text"]
+        processed_text = preprocess_text(user_text)
+        vectorized = tfidf_vectorizer.transform([processed_text])
+        prediction = model.predict(vectorized)[0]
+        probabilities = model.predict_proba(vectorized)[0]
+        return render_template("index.html",
+                               input_text=user_text,
+                               prediction=prediction,
+                               probabilities=dict(zip(model.classes_, probabilities)))
+    return render_template("index.html")
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
